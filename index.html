@@ -83,7 +83,7 @@
         }
 
         .main {
-
+            position: relative;
             margin: 10px 20px;
             gap: 5px;
             justify-content: space-around;
@@ -146,10 +146,14 @@
         }
 
         .bottomBarText {
-            font-size: 12px;
+            font-size: 13px;
             color: #777;
             margin: 0px auto;
             text-decoration: none;
+        }
+        
+        .name {
+            color: #eee;
         }
 
         .credits {
@@ -168,6 +172,19 @@
             text-decoration: none;
             border-radius: 5px;
             height: 25px;
+        }
+
+        .alert {
+            display: none;
+            position: absolute; 
+            right: 15px;
+            top: -15px;
+            background-color: #fa736b;
+            padding: 5px 10px;
+            border-radius: 10px;
+            border: 5px solid rgb(250, 45, 45);
+            text-decoration: none;
+            color: white;
         }
     </style>
 </head>
@@ -189,9 +206,9 @@
                     <!-- <a href="#" class="download-button">Download Now</a>
                   -->
                     <!-- <a href="https://www.flaticon.com/free-icons/download" title="download icons" class="download-button">Download icons created by Catalin Fertu - Flaticon</a> -->
-                    <div class="upcomingInfo">
+                    <!-- <div class="upcomingInfo">
                         Browser Extension<br>Coming Soon!
-                    </div>
+                    </div> -->
                     <div class="iosUpcomingInfo">
                         Currently Unavailable for IOS
                     </div>
@@ -200,6 +217,10 @@
 
         </div>
         <div class="main">
+            <a class="alert" href="https://chromewebstore.google.com/detail/WiFix/adkmbifmldepnhdagnfoeijmfkdfkfao">
+                <p>Browser Extension Now Available!</p>
+            </a>
+
             <h2 class="mainText">Never login to WiFi ever again!</h2>
 
             <img src="./assets/appScreenshot.jpeg" alt="App Screenshot" class="screenshot">
@@ -209,10 +230,15 @@
                 <p class="autotype special"></p>
             </div>
             <div class="credits">
-                <a class="bottomBarText" href="https://www.linkedin.com/in/mathewmanachery/">Developed by Mathew
-                    Manachery</a>
-                <a class="bottomBarText" href="https://www.linkedin.com/in/muhammed-basil-5b1144326/">Logo by Muhammed
-                    Basil</a>
+                <p class="bottomBarText">Developed by
+                    <a class="bottomBarText name" href="https://www.linkedin.com/in/mathewmanachery/">Mathew
+                    Manachery</a> and 
+                    <a class="bottomBarText name" href="https://www.linkedin.com/in/noel-georgi-22521a303/">Noel Georgi</a>
+                </p>
+                <!-- <a class="bottomBarText" href="https://www.linkedin.com/in/mathewmanachery/">Developed by Mathew Manachery and Noel Georgi</a> -->
+                
+                <a class="bottomBarText" href="https://www.linkedin.com/in/muhammed-basil-5b1144326/">Logo by <span class="name">Muhammed
+                    Basil</span></a>
             </div>
         </div>
     </div>
@@ -221,8 +247,10 @@
     <script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
     <script>
         const downloadButton = document.querySelector('.download-button');
+        const extensionUrl = "https://chromewebstore.google.com/detail/WiFix/adkmbifmldepnhdagnfoeijmfkdfkfao";
         const upcomingInfo = document.querySelector('.upcomingInfo');
         const iosUpcomingInfo = document.querySelector('.iosUpcomingInfo');
+        const alertTab = document.querySelector('.alert');
         const userAgent = navigator.userAgent;
         let downloadUrl = 'https://github.com/mathew2103/WiFix/releases/download/v1.1.0/Wifix.v1.1.apk';
 
@@ -246,13 +274,18 @@
                 window.location.href = downloadUrl;
             });
         } else {
-            downloadButton.style.cursor = 'not-allowed';
+            downloadButton.style.cursor = 'pointer';
+            alertTab.style.display = 'block';
+            downloadButton.addEventListener('click', (e) => {
+                window.location.href = extensionUrl;
+            });
+            /* downloadButton.style.cursor = 'not-allowed';
             downloadButton.addEventListener('mouseover', () => {
                 upcomingInfo.style.display = 'block';
             });
             downloadButton.addEventListener('mouseout', () => {
                 upcomingInfo.style.display = 'none';
-            });
+            }); */
         }
 
 
