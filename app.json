@@ -41,7 +41,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "expo-background-task"
     ],
     "runtimeVersion": "1.0.0",
     "updates": {

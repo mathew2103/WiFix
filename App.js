@@ -1,23 +1,45 @@
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, View, Button, TextInput, StatusBar, TouchableOpacity, Linking, Switch, Image, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { addEventListener } from "@react-native-community/netinfo";
-import * as BackgroundFetch from 'expo-background-fetch';
+// import * as BackgroundFetch from 'expo-background-fetch';
+import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
 import { MaterialCommunityIcons, AntDesign } from '@expo/vector-icons';
 import { useAsyncStorage } from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import ToastManager, { Toast } from 'toastify-react-native'
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const BACKGROUND_FETCH_TASK = 'background-fetch';
+const APP_VERSION = "1.2.0";
+const BACKGROUND_TASK_IDENTIFIER = 'background-fetch';
+
+TaskManager.defineTask(BACKGROUND_TASK_IDENTIFIER, async () => {
+      try {
+        await logToStorage("Background fetch task running");
+        const l = await forceLogin(true);
+        if (l == 0) {
+          await logToStorage("Background fetch task completed");
+          return BackgroundTask.BackgroundTaskResult.Success;
+        } else {
+          await logToStorage(`Background fetch task failed ${l}`);
+          return BackgroundTask.BackgroundTaskResult.Failed;
+        }
+
+      } catch (error) {
+        await logToStorage(`Background fetch task error: ${error}`);
+        return BackgroundTask.BackgroundTaskResult.Failed;
+      }
+    });
 
 async function registerBackgroundFetchAsync() {
-  return BackgroundFetch.registerTaskAsync(BACKGROUND_FETCH_TASK, {
+  return BackgroundTask.registerTaskAsync(BACKGROUND_TASK_IDENTIFIER, {
     minimumInterval: 31 * 60, //half an hour DEV
     stopOnTerminate: false, // android only,
     startOnBoot: true, // android only
   });
 } 
 async function unregisterBackgroundFetchAsync() {
-  return BackgroundFetch.unregisterTaskAsync(BACKGROUND_FETCH_TASK);
+  return BackgroundTask.unregisterTaskAsync(BACKGROUND_TASK_IDENTIFIER);
 }
 
 const logToStorage = async (message) => {
@@ -71,22 +93,30 @@ export default function App() {
     const loginPass = await getPass();
     trial++;
     try {
+      // GET Url
+      const loginURL = await detectCaptivePortalUrl() ?? "http://172.16.222.1:1000/login?0330598d1f22608a";
+
       await logToStorage("GETTING magic")
-      const fetched = await axios.get("http://172.16.222.1:1000/login?0330598d1f22608a").catch(async (e) => {
+      const fetched = await axios.get(loginURL).catch(async (e) => {
         console.log(e)
         return await logToStorage(`Error fetching magic: ${e?.code}`);
       })
 
       if (!fetched || fetched?.status !== 200) {
         logToStorage("Failed to get magic");
-        if (!bg) Alert.alert("Not connected to IIIT Kottayam");
+        Toast.error("Not connected to IIIT Kottayam");
         return 1;
       }
       
       const magic = fetched.data.match(/magic" value="([a-zA-Z0-9]+)"/i)[1];
 
       await logToStorage("POSTING login");
-      const r2 = await axios.post("http://172.16.222.1:1000/", `magic=${magic}&username=${encodeURIComponent(loginUser)}&password=${encodeURIComponent(loginPass)}`).catch(async e => {
+      // Extract base URL from loginURL
+      const baseUrl = loginURL.replace(/\/[^\/]*$/, '/');
+      const r2 = await axios.post(
+        baseUrl,
+        `magic=${magic}&username=${encodeURIComponent(loginUser)}&password=${encodeURIComponent(loginPass)}`
+      ).catch(async e => {
         console.log(e);
         await logToStorage(`ERR Posting: ${e?.message}`);  
         return null;
@@ -96,7 +126,7 @@ export default function App() {
       if (!r2) {
         if (trial < 3) {  
           await logToStorage(`Failed login on try ${trial}`);
-          Alert.alert("Failed login. Trying again in 5s");
+            Toast.error("Failed login. Trying again in 5s");
           await new Promise(resolve => setTimeout(resolve, 5000));
           return await forceLogin(bg);
         } else {  
@@ -106,21 +136,21 @@ export default function App() {
         }
       }else if(r2.data.includes("failed")){
         await logToStorage(`Failed login ${loginUser} | ${loginPass[0]}`);
-        if (!bg) Alert.alert("Incorrect Credentials");
+        if (!bg) Toast.error("Incorrect Credentials");
         return 3;
       }
       
       await logToStorage("Success");
       console.log('connected now')
-      if (!bg) Alert.alert("Connected");
+      Toast.success("Connected");
       await updateLast();
       trial = 0;
       return 0;
     } catch (e) {
-      if (!bg) Alert.alert("Error occured!");
-      console.error(e);
-      await logToStorage(`Uncaught Error: ${e}`);
-      return e;
+      // if (!bg) Toast.error("Error occured!");
+      // console.error(e);
+      // await logToStorage(`Uncaught Error: ${e}`);
+      // return e;
     }
 
 
@@ -128,12 +158,12 @@ export default function App() {
 
   const verifyInfo = async () => {
     if (pass == null) {
-      Alert.alert("Invalid username or password");
+      Toast.error("Invalid username or password");
       return false;
     }
 
-    if (user.length != 11 || !(/^202[1-9](bc[a-z]|bec)[0-9]{4}$/gmi.test(user))) {
-      Alert.alert("Invalid Username");
+    if (user.length != 11 || !(/^202[1-9](bc[a-z]|bec)[0-9]{4}$/gi.test(user))) {
+      Toast.error("Invalid Username");
       return false;
     }
     return true;
@@ -179,6 +209,57 @@ export default function App() {
 
   }
 
+  const detectCaptivePortalUrl = async () => {
+    try {
+      // Google's connectivity check URL
+      const testUrl = "http://connectivitycheck.gstatic.com/generate_202";
+      const response = await fetch(testUrl, {
+        method: "GET",
+        redirect: "manual",
+      });
+
+
+      // If status is 204, no captive portal
+      if (response.status === 204) {
+        await logToStorage("No captive portal detected.");
+        return null;
+      }
+
+      // If redirected, get the Location header (captive portal URL)
+      if (response.status >= 300 && response.status < 400) {
+        const portalUrl = response.headers.get("Location");
+        await logToStorage(`Captive portal detected: ${portalUrl}`);
+        return portalUrl;
+      }
+
+      // Some captive portals return 200 with HTML content
+      if (response.status === 200) {
+        const text = await response.text();
+        // Try to extract a URL from the HTML (very basic)
+        // Try to extract a URL from window.location assignment in HTML
+        const match = text.match(/window\.location\s*=\s*["']([^"']+)["']/i);
+        if (match && match[1]) {
+          await logToStorage(`Captive portal JS redirect: ${match[1]}`);
+          return match[1];
+        }
+        // Fallback: Try meta refresh
+        const metaMatch = text.match(/<meta[^>]+url=['"]?([^'">]+)/i);
+        if (metaMatch && metaMatch[1]) {
+          await logToStorage(`Captive portal meta redirect: ${metaMatch[1]}`);
+          return metaMatch[1];
+        }
+        await logToStorage("Captive portal detected, but URL not found in HTML.");
+        return null;
+      }
+
+      await logToStorage(`Unexpected response: ${response.status}`);
+      return null;
+    } catch (error) {
+      await logToStorage(`Error detecting captive portal: ${error}`);
+      return null;
+    }
+  };
+
 
   const submitted = async () => {
 
@@ -197,23 +278,7 @@ export default function App() {
 
   useEffect(() => {
     readAll();
-    TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
-      try {
-        await logToStorage("Background fetch task running");
-        const l = await forceLogin(true);
-        if (l == 0) {
-          await logToStorage("Background fetch task completed");
-          return BackgroundFetch.BackgroundFetchResult.NewData;
-        } else {
-          await logToStorage(`Background fetch task failed ${l}`);
-          return BackgroundFetch.BackgroundFetchResult.NoData;
-        }
-
-      } catch (error) {
-        await logToStorage(`Background fetch task error: ${error}`);
-        return BackgroundFetch.BackgroundFetchResult.Failed;
-      }
-    });
+    
 
     if (toggle) {
       listener = (addEventListener(state => {
@@ -231,7 +296,14 @@ export default function App() {
 
   }, []);
 
+  const triggerTask = async () => {
+    await BackgroundTask.triggerTaskWorkerForTestingAsync();
+  };
+
+
   return (
+    <>
+     <SafeAreaView style={{ flex: 1 }}>
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}
       accessible={false}>
       <View style={styles.container}>
@@ -282,7 +354,7 @@ export default function App() {
 
 
           <TouchableOpacity onPress={() => Linking.openURL("https://github.com/mathew2103/wifix")} style={{ justifyContent: "center", display: "flex", alignItems: "center", flexDirection: "row" }}>
-            <Text style={styles.footerText}>Version {require("./app.json").expo.version}</Text>
+            <Text style={styles.footerText}>Version {APP_VERSION}</Text>
             <AntDesign color="white" size={16} name='github' style={{ alignContent: "center", alignSelf: "center", paddingLeft: 5 }} />
           </TouchableOpacity>
 
@@ -292,8 +364,12 @@ export default function App() {
 
         <StatusBar backgroundColor='#000' barStyle='light-content' />
 
+
       </View>
     </TouchableWithoutFeedback>
+        <ToastManager theme='dark' duration={2500} topOffset={55}/>
+        </SafeAreaView>
+        </>
   );
 
 }
