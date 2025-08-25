@@ -8,7 +8,9 @@ import { MaterialCommunityIcons, AntDesign } from '@expo/vector-icons';
 import { useAsyncStorage } from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import ToastManager, { Toast } from 'toastify-react-native'
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+const APP_VERSION = "1.2.0";
 const BACKGROUND_TASK_IDENTIFIER = 'background-fetch';
 
 TaskManager.defineTask(BACKGROUND_TASK_IDENTIFIER, async () => {
@@ -300,6 +302,8 @@ export default function App() {
 
 
   return (
+    <>
+     <SafeAreaView style={{ flex: 1 }}>
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}
       accessible={false}>
       <View style={styles.container}>
@@ -350,7 +354,7 @@ export default function App() {
 
 
           <TouchableOpacity onPress={() => Linking.openURL("https://github.com/mathew2103/wifix")} style={{ justifyContent: "center", display: "flex", alignItems: "center", flexDirection: "row" }}>
-            <Text style={styles.footerText}>Version {require("./app.json").expo.version}</Text>
+            <Text style={styles.footerText}>Version {APP_VERSION}</Text>
             <AntDesign color="white" size={16} name='github' style={{ alignContent: "center", alignSelf: "center", paddingLeft: 5 }} />
           </TouchableOpacity>
 
@@ -361,9 +365,11 @@ export default function App() {
         <StatusBar backgroundColor='#000' barStyle='light-content' />
 
 
-        <ToastManager />
       </View>
     </TouchableWithoutFeedback>
+        <ToastManager theme='dark' duration={2500} topOffset={55}/>
+        </SafeAreaView>
+        </>
   );
 
 }
