@@ -1,24 +1,43 @@
 import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, View, Button, TextInput, StatusBar, TouchableOpacity, Linking, Switch, Image, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { addEventListener } from "@react-native-community/netinfo";
-import * as BackgroundFetch from 'expo-background-fetch';
+// import * as BackgroundFetch from 'expo-background-fetch';
+import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
 import { MaterialCommunityIcons, AntDesign } from '@expo/vector-icons';
 import { useAsyncStorage } from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import ToastManager, { Toast } from 'toastify-react-native'
 
-const BACKGROUND_FETCH_TASK = 'background-fetch';
+const BACKGROUND_TASK_IDENTIFIER = 'background-fetch';
+
+TaskManager.defineTask(BACKGROUND_TASK_IDENTIFIER, async () => {
+      try {
+        await logToStorage("Background fetch task running");
+        const l = await forceLogin(true);
+        if (l == 0) {
+          await logToStorage("Background fetch task completed");
+          return BackgroundTask.BackgroundTaskResult.Success;
+        } else {
+          await logToStorage(`Background fetch task failed ${l}`);
+          return BackgroundTask.BackgroundTaskResult.Failed;
+        }
+
+      } catch (error) {
+        await logToStorage(`Background fetch task error: ${error}`);
+        return BackgroundTask.BackgroundTaskResult.Failed;
+      }
+    });
 
 async function registerBackgroundFetchAsync() {
-  return BackgroundFetch.registerTaskAsync(BACKGROUND_FETCH_TASK, {
+  return BackgroundTask.registerTaskAsync(BACKGROUND_TASK_IDENTIFIER, {
     minimumInterval: 31 * 60, //half an hour DEV
     stopOnTerminate: false, // android only,
     startOnBoot: true, // android only
   });
 } 
 async function unregisterBackgroundFetchAsync() {
-  return BackgroundFetch.unregisterTaskAsync(BACKGROUND_FETCH_TASK);
+  return BackgroundTask.unregisterTaskAsync(BACKGROUND_TASK_IDENTIFIER);
 }
 
 const logToStorage = async (message) => {
@@ -115,7 +134,7 @@ export default function App() {
         }
       }else if(r2.data.includes("failed")){
         await logToStorage(`Failed login ${loginUser} | ${loginPass[0]}`);
-        if (!bg) Alert.alert("Incorrect Credentials");
+        if (!bg) Toast.error("Incorrect Credentials");
         return 3;
       }
       
@@ -126,7 +145,7 @@ export default function App() {
       trial = 0;
       return 0;
     } catch (e) {
-      // if (!bg) Alert.alert("Error occured!");
+      // if (!bg) Toast.error("Error occured!");
       // console.error(e);
       // await logToStorage(`Uncaught Error: ${e}`);
       // return e;
@@ -137,12 +156,12 @@ export default function App() {
 
   const verifyInfo = async () => {
     if (pass == null) {
-      Alert.alert("Invalid username or password");
+      Toast.error("Invalid username or password");
       return false;
     }
 
-    if (user.length != 11 || !(/^202[1-9](bc[a-z]|bec)[0-9]{4}$/gmi.test(user))) {
-      Alert.alert("Invalid Username");
+    if (user.length != 11 || !(/^202[1-9](bc[a-z]|bec)[0-9]{4}$/gi.test(user))) {
+      Toast.error("Invalid Username");
       return false;
     }
     return true;
@@ -214,7 +233,6 @@ export default function App() {
       // Some captive portals return 200 with HTML content
       if (response.status === 200) {
         const text = await response.text();
-        console.log(text);  
         // Try to extract a URL from the HTML (very basic)
         // Try to extract a URL from window.location assignment in HTML
         const match = text.match(/window\.location\s*=\s*["']([^"']+)["']/i);
@@ -258,23 +276,7 @@ export default function App() {
 
   useEffect(() => {
     readAll();
-    TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
-      try {
-        await logToStorage("Background fetch task running");
-        const l = await forceLogin(true);
-        if (l == 0) {
-          await logToStorage("Background fetch task completed");
-          return BackgroundFetch.BackgroundFetchResult.NewData;
-        } else {
-          await logToStorage(`Background fetch task failed ${l}`);
-          return BackgroundFetch.BackgroundFetchResult.NoData;
-        }
-
-      } catch (error) {
-        await logToStorage(`Background fetch task error: ${error}`);
-        return BackgroundFetch.BackgroundFetchResult.Failed;
-      }
-    });
+    
 
     if (toggle) {
       listener = (addEventListener(state => {
@@ -291,6 +293,11 @@ export default function App() {
     });
 
   }, []);
+
+  const triggerTask = async () => {
+    await BackgroundTask.triggerTaskWorkerForTestingAsync();
+  };
+
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}

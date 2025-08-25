@@ -20,7 +20,9 @@
     "expo-updates": "~0.28.17",
     "react": "19.0.0",
     "react-native": "0.79.5",
-    "toastify-react-native": "^7.2.3"
+    "toastify-react-native": "^7.2.3",
+    "expo-background-task": "~0.2.8",
+    "expo-dev-client": "~5.2.4"
   },
   "devDependencies": {
     "@babel/core": "^7.26.0"
